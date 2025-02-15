@@ -1,0 +1,17 @@
+# Python
+/.idea
+/venv
+/env
+__pycache__/
+
+# Data
+/data
+
+# Models
+/models
+model_saves/
+
+# Results & Logs
+example_validation_uncertainty_maps.pdf
+example_test_uncertainty_maps.pdf
+calibration_curves.pdf
