@@ -9,7 +9,6 @@ __pycache__/
 
 # Models
 /models
-model_saves/
 
 # Results & Logs
 example_validation_uncertainty_maps.pdf
