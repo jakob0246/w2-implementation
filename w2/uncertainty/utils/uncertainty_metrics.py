@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from scipy.special import softmax
-from scipy.special import expit as sigmoid
 from scipy.stats import entropy
 
 
@@ -33,7 +32,7 @@ def std_deviation_uncertainty_metric(outputs):
     return std_deviation_maps
 
 
-def std_deviation_uncertainty_metric_refined(outputs, pos_class=0):
+def std_deviation_uncertainty_metric_refined(outputs):
     """
     Takes all sampling output logits and combines them to one uncertainty map with help of
     utilizing the standard deviation.
@@ -54,22 +53,19 @@ def std_deviation_uncertainty_metric_refined(outputs, pos_class=0):
     outputs = np.array(outputs)
     num_classes = outputs.shape[2]
 
-    if num_classes == 1:
-        outputs = sigmoid(np.array(outputs))[:, :, 0, :, :]
-    else:
-        outputs = softmax(np.array(outputs), axis=2)[:, :, pos_class, :, :]
-    # if num_classes == 2:
-        # outputs = outputs[:, :, 1, :, :]
+    outputs = softmax(np.array(outputs), axis=2)
+    if num_classes == 2:
+        outputs = outputs[:, :, 1, :, :]
     std_deviation_maps = np.std(outputs, axis=0)
-    #if num_classes != 1:
-        #std_deviation_maps = np.mean(std_deviation_maps, axis=1)
+    if num_classes != 2:
+        std_deviation_maps = np.mean(std_deviation_maps, axis=1)
     # Normalize, since standard deviations have a small value range
     std_deviation_maps = np.array([_normalize(std_deviation_map) for std_deviation_map in std_deviation_maps])
     std_deviation_maps = torch.tensor(std_deviation_maps)
     return std_deviation_maps
 
 
-def softmax_uncertainty_metric(output, pos_class=0):
+def softmax_uncertainty_metric(output, pos_class=1):
     """
     Takes the output logits of one evaluation pass and focuses on the positive class, e.g. the flood class.
     As a final step, maps are normalized.
@@ -94,14 +90,9 @@ def softmax_uncertainty_metric(output, pos_class=0):
     return uncertainty_map
 
 
-def counter_max_prob_metric(outputs, pos_class):
-    """TODO: explain this metric!"""
+def counter_max_prob_metric(outputs):
     outputs = np.mean(np.array(outputs), axis=0)
-    num_classes = outputs.shape[1]
-    if num_classes == 1:
-        outputs = sigmoid(outputs)[:, 0, :, :]
-    else:
-        outputs = softmax(outputs, axis=1)[:, pos_class, :, :]
+    outputs = softmax(np.array(outputs), axis=1)[:, 1, :, :]
     outputs[outputs > 0.5] = 1 - outputs[outputs > 0.5]
     # Normalize
     uncertainty_map = np.array([_normalize(output) for output in outputs])

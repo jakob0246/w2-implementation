@@ -1,11 +1,21 @@
 import torch
 from tqdm import tqdm
+import ttach as tta
+import numpy as np
 
 from .utils.evaluator import evaluate
 from .utils.utils import InMemoryDataset
 
 
-def estimate_uncertainty(model, images, preprocess, postprocess, augmentations, noise_factor, collate_fn):
+transform_augmentations = tta.Compose([
+    tta.HorizontalFlip(),
+    tta.VerticalFlip(),
+    tta.Rotate90(angles=[0, 180]),
+    tta.Multiply(factors=[0.95, 1.0, 1.05])
+])
+
+
+def estimate_uncertainty(model, images, preprocess, postprocess, noise_factor, collate_fn):
     """
     Applies test time data augmentation uncertainty estimation to given images.
     The approach applies horizontal-flip, vertical-flip, 180-rotations, multiplications and gaussian noise as
@@ -21,8 +31,6 @@ def estimate_uncertainty(model, images, preprocess, postprocess, augmentations, 
         A function being in the form of `(tensor) -> (tensor)`.
     postprocess : callable
         Should have the form `(tensor) -> (tensor)`.
-    augmentations : list
-        A list of augmentations to be applied.
     noise_factor : float
         The amount of gaussian noise to be applied.
     collate_fn : callable
@@ -38,8 +46,8 @@ def estimate_uncertainty(model, images, preprocess, postprocess, augmentations, 
     print()
 
     model_outputs = []
-    for transform in tqdm(augmentations,
-                          desc=f"Running {len(augmentations)} (+1) data augmentation passes", unit="samples",
+    for transform in tqdm(transform_augmentations,
+                          desc=f"Running {len(transform_augmentations)} (+1) data augmentation passes", unit="samples",
                           bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
         augmented_images = transform.augment_image(torch.stack(images))
 
@@ -51,8 +59,6 @@ def estimate_uncertainty(model, images, preprocess, postprocess, augmentations, 
 
         if postprocess is not None:
             model_output = postprocess(torch.from_numpy(model_output))
-        else:
-            model_output = torch.from_numpy(model_output)
         model_output = transform.deaugment_mask(model_output)
 
         model_outputs.append(model_output)
@@ -65,14 +71,12 @@ def estimate_uncertainty(model, images, preprocess, postprocess, augmentations, 
     model_output = evaluate(model, eval_loader, use_seed=True)
     if postprocess is not None:
         model_output = postprocess(torch.from_numpy(model_output))
-    else:
-        model_output = torch.from_numpy(model_output)
-    model_outputs.append(model_output)
+    model_outputs.append(np.array(model_output))
 
     return model_outputs
 
 
 def gaussian_noise_augmentation(images, factor):
     # Add gaussian noise
-    images += factor * torch.normal(0, float(torch.max(images)), size=images.shape)
+    images += factor * torch.normal(0, 1, size=images.shape)
     return images

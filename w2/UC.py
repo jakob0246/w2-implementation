@@ -49,12 +49,6 @@ class UC:
                     (callable, ((tensor, tensor)) -> (tensor, tensor), first elements of the
                     input / output tuples are images of shape (#Channels, N, M) & second elements are labels of shape
                     (N, M))
-            - "data-augmentation"
-                - "augmentations" (tta.Compose) from https://github.com/qubvel/ttach, "noise_factor" (float)
-            - "dropout"
-                - "num_samples" (int)
-            - "weight-noise"
-                - "num_samples" (int), "noise_factor" (float)
     postprocess : callable, optional
         Postprocesses a set of tensors in the final step of applying the uncertainty method.
         Should have the form `(tensor) -> (tensor)`. The elements from the input and output tensors have the shape
@@ -66,6 +60,7 @@ class UC:
     """
 
     _available_methods = ["student-ensemble", "data-augmentation", "softmax", "dropout", "weight-noise"]
+    # TODO: classification, regression
     _available_modes = ["segmentation"]
     _available_metrics = ["std", "counter_max", "second_max", "true_class", "entropy"]
 
@@ -106,7 +101,7 @@ class UC:
 
         self._fill_up_with_default_params()
 
-    def predict(self, images, metric="std", pos_class=1, labels=None, label_preprocess=None, ignore_index=None):
+    def predict(self, images, metric="std", labels=None, label_preprocess=None, ignore_index=None):
         """
         Predict uncertainty quantification values for a given list of images.
 
@@ -119,12 +114,7 @@ class UC:
             The uncertainty quantification metric.
             Available metrics are: "std", "counter_max", "second_max", "true_class" and "entropy".
             The default is "std".
-            Explanation for the metrics:
-                - "std": Standard deviation of the model output logits.
-                - "counter_max": 1 - probability of highest class.
-                - "second_max": 1 - (probability of highest and second-highest probability).
-                - "true_class": Highest probability - true class probability.
-                - "entropy": Entropy of the model output distribution.
+            TODO: Explain choices
         labels : tensor, optional
             Reference labels to use if "true_class" metric should be applied.
             Otherwise, the parameter will be ignored.
@@ -140,7 +130,7 @@ class UC:
 
         assert metric in self._available_metrics, "Passed metric not available"
 
-        uncertainties = {}
+        uncertainties = []
         for method in self.methods:
             model_sampling_output = self._get_model_sampling_output(method, images)
 
@@ -154,16 +144,16 @@ class UC:
 
             print("\nApplying uncertainty metric ...")
 
-            if method == "softmax":  # and metric == "counter_max":
-                uncertainty = softmax_uncertainty_metric(model_sampling_output, pos_class)
+            if method == "softmax" and metric == "std":
+                uncertainty = softmax_uncertainty_metric(model_sampling_output)
             else:
-                #if method == "softmax":
-                    #uncertainty = model_sampling_output[:, pos_class, :, :]
+                if method == "softmax":
+                    model_sampling_output = np.array([model_sampling_output])
 
                 if metric == "std":
-                    uncertainty = std_deviation_uncertainty_metric_refined(model_sampling_output, pos_class)
+                    uncertainty = std_deviation_uncertainty_metric_refined(model_sampling_output)
                 elif metric == "counter_max":
-                    uncertainty = counter_max_prob_metric(model_sampling_output, pos_class)
+                    uncertainty = counter_max_prob_metric(model_sampling_output)
                 elif metric == "second_max":
                     uncertainty = two_highest_prob_metric(model_sampling_output)
                 elif metric == "true_class":
@@ -175,8 +165,9 @@ class UC:
                 else:
                     uncertainty = entropy_metric(model_sampling_output)
 
-            uncertainties[method] = uncertainty
+            uncertainties.append(uncertainty)
 
+        uncertainties = torch.stack(uncertainties)
         return uncertainties
 
     def generate_calibration_curves(self, num_classes, val_data, ignore_index=None, save_dir=os.path.join("..", "results")):
@@ -254,7 +245,7 @@ class UC:
                                            self.postprocess, ignore_index, self.collate_fn, save_dir)
 
     def evaluate_metric_correlation(self, val_data, label_preprocess=None, ignore_index=None,
-                                    save_dir=os.path.join("..", "results")):
+                                     save_dir=os.path.join("..", "results")):
         """
         Evaluates the correlation of uncertainty scores for all available metrics for the first method in `methods`.
         """
@@ -317,7 +308,6 @@ class UC:
                 images,
                 self.preprocess,
                 self.postprocess,
-                self.params[method]["augmentations"],
                 self.params[method]["noise_factor"],
                 self.collate_fn
             )

@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from scipy.special import softmax
-from scipy.special import expit as sigmoid
 
 from .utils.evaluator import evaluate
 from .utils.utils import InMemoryDataset
@@ -35,10 +34,6 @@ def estimate_uncertainty(model, images, preprocess, collate_fn):
     eval_loader = torch.utils.data.DataLoader(eval_dataset, batch_size=4, shuffle=False, num_workers=1,
                                               collate_fn=collate_fn, pin_memory=True)
     model_output = evaluate(model, eval_loader, use_seed=True)
-    num_classes = model_output.shape[1]
-    if num_classes == 1:
-        model_output = sigmoid(np.array(model_output))
-    else:
-        model_output = softmax(np.array(model_output), axis=1)
+    model_output = softmax(np.array(model_output), axis=1)
 
     return model_output
