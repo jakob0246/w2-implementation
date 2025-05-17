@@ -19,7 +19,7 @@ def estimate_uncertainty(model, images, preprocess, postprocess, noise_factor, c
     """
     Applies test time data augmentation uncertainty estimation to given images.
     The approach applies horizontal-flip, vertical-flip, 180-rotations, multiplications and gaussian noise as
-    augmentations.
+    augmentations. Code is based on https://github.com/RedekopEP/SUE
 
     Parameters
     ----------

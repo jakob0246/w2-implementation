@@ -8,9 +8,7 @@ from .utils.utils import InMemoryDataset
 
 def estimate_uncertainty(model, images, preprocess, collate_fn):
     """
-    Applies test time data augmentation uncertainty estimation to given images.
-    The approach applies horizontal-flip, vertical-flip, 180-rotations, multiplications and gaussian noise as
-    augmentations.
+    Applies softmax uncertainty estimation to given images.
 
     Parameters
     ----------
